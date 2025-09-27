@@ -38,12 +38,12 @@ def effectSizer(df, num_col, cat_col):
     ValueError: If the categorical column does not have exactly two unique values.
     """
     # Drop rows with NA in relevant columns
-    sub = df[[num_col, binary_col]].dropna()
+    sub = df[[num_col, cat_col]].dropna()
 
     # Make sure the binary column has exactly 2 unique values
-    unique_vals = sub[binary_col].unique()
+    unique_vals = sub[cat_col].unique()
     if len(unique_vals) != 2:
-        raise ValueError(f"'{binary_col}' must have exactly 2 unique values. Found: {unique_vals}")
+        raise ValueError(f"'{cat_col}' must have exactly 2 unique values. Found: {unique_vals}")
 
         # Ensure group with value 1 is used as x1
     if 1 in unique_vals:
@@ -52,8 +52,8 @@ def effectSizer(df, num_col, cat_col):
     else:
         x1, x0 = unique_vals[0], unique_vals[1]  # fallback
 
-    group1 = sub[sub[binary_col] == x1][num_col]
-    group0 = sub[sub[binary_col] == x0][num_col]
+    group1 = sub[sub[cat_col] == x1][num_col]
+    group0 = sub[sub[cat_col] == x0][num_col]
 
     mean1, mean0 = group1.mean(), group0.mean()
     std1, std0 = group1.std(), group0.std()
@@ -74,28 +74,9 @@ def effectSizer(df, num_col, cat_col):
 def cohenEffectSize(group1, group2):
     # You need to implement this helper function
     # This should not be too hard...
-   pass
-    import numpy as np
 
     # Convert to numpy arrays and drop NaNs
-    group1 = np.array(group1).astype(float)
-    group2 = np.array(group2).astype(float)
-
-    group1 = group1[~np.isnan(group1)]
-    group2 = group2[~np.isnan(group2)]
-
-    # Means and standard deviations
-    mean1, mean2 = np.mean(group1), np.mean(group2)
-    std1, std2 = np.std(group1, ddof=1), np.std(group2, ddof=1)
-
-    # Pooled standard deviation
-    pooled_std = np.sqrt((std1**2 + std2**2) / 2)
-
-    # Cohen's d
-    if pooled_std == 0:
-
-    return
-
+    pass
 
 
 def cohortCompare(df, cohorts, statistics=['mean', 'median', 'std', 'min', 'max']):
@@ -103,18 +84,33 @@ def cohortCompare(df, cohorts, statistics=['mean', 'median', 'std', 'min', 'max'
     This function takes a dataframe and a list of cohort column names, and returns a dictionary
     where each key is a cohort name and each value is an object containing the specified statistics
     """
-    metrics = CohortMetric('Full Dataset')
+    result = {}
 
-    num_columns = df.select_dtypes(include='number').columns
-    cat_columns = [col for col in cat_columns if col in df.columns]
+    # Numerical columns
+    num_cols = df.select_dtypes(include='number').columns
+    for col in num_cols:
+        metric = CohortMetric(col)
+        if 'mean' in statistics:
+            metric.setMean(df[col].mean())
+        if 'median' in statistics:
+            metric.setMedian(df[col].median())
+        if 'std' in statistics:
+            metric.setStd(df[col].std())
+        if 'min' in statistics:
+            metric.setMin(df[col].min())
+        if 'max' in statistics:
+            metric.setMax(df[col].max())
+        result[col] = metric
 
-    for col in num_columns:
-        metrics.add_numerical_stats(col, df[col])
+    # Categorical columns
+    for col in categorical_cols:
+        counts = df[col].value_counts(dropna=False).to_dict()
+        metric = CohortMetric(col)
+        metric.statistics = {"counts": counts}
+        result[col] = metric
 
-    for col in cat_columns:
-        metrics.add_categorical_counts(col,df[col])
+    return result
 
-    return{'Full Dataset': metrics}
   
 
 class CohortMetric():
